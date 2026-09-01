@@ -1,0 +1,190 @@
+# Affogata Benchmarks — a WebMCP-native customer-voice benchmark
+
+**Built for the [OpenAI WebMCP Challenge](https://webmcp.devpost.com/).**
+
+79 games and apps, across 8 industries and 16 categories, scored 0–10 on what their
+customers actually say — per release, updated weekly. The same page is readable by a
+person and *operable by an agent*: every number on screen is exposed through
+`document.modelContext.registerTool()`, and five of the fifteen tools drive the UI itself,
+so the browser moves while the agent talks.
+
+> Data mirrors the live benchmark at [affogata.com/benchmarks](https://www.affogata.com/benchmarks/).
+> Most figures are illustrative pending source wiring; the review-pulse rows come from a real
+> Affogata MCP pull. Brand names are trademarks of their owners.
+
+---
+
+## Why WebMCP for this
+
+A benchmark is a research surface. People do not arrive wanting "the page" — they arrive
+with a question: *who lost the most goodwill this week, and why?* Answering it on a normal
+site means clicking through sixteen categories and holding numbers in your head.
+
+Two shapes of that problem exist today, and both are bad:
+
+- **Screen-scraping agents** re-derive the page by pixels and DOM guesses. Brittle, slow,
+  and they routinely misread a −0.7 as a −7.
+- **A separate REST/MCP server** answers the agent but leaves the human staring at a
+  different, unsynchronised view. The user asks "show me", and nothing on screen moves.
+
+WebMCP removes the gap. The tools here wrap the code the site already runs — the same
+selectors, the same store — so what the agent is told and what the human sees cannot
+diverge. And because tools can *act*, "open the dating category and tell me what all three
+big players get wrong" ends with the user looking at that category, not reading a paragraph
+about it.
+
+---
+
+## The tool surface — 15 tools
+
+Every tool is namespaced `benchmarks_*`, declares a JSON Schema, and carries
+`annotations.readOnlyHint` so a host knows which ones change state.
+
+### Read (10)
+
+| Tool | What it answers |
+| --- | --- |
+| `benchmarks_get_overview` | State of all 79 titles: distribution, happiest/unhappiest, biggest movers, rising and falling topics. |
+| `benchmarks_list_categories` | 16 categories with counts, averages and leaders. Optional industry filter. |
+| `benchmarks_list_titles` | Filter by category / industry / text / min score; sort by score, delta, momentum or volatility. |
+| `benchmarks_get_title` | Full profile for one title: history, topic clusters, analyst read, movement, live review pulse. |
+| `benchmarks_get_category_analytics` | Average, median, spread, leader/laggard, band split, gainers/droppers, topic frequency. |
+| `benchmarks_get_movers` | Week-over-week ranking — what changed since the last report. |
+| `benchmarks_compare_titles` | 2–5 titles across 8 metrics, plus shared and distinctive topic clusters. |
+| `benchmarks_find_by_topic` | Cross-category topic search: who is praised or punished for "paywall", "support", "ads"… |
+| `benchmarks_export_dataset` | Raw rows as `structuredContent` JSON for the agent's own analysis. |
+| `benchmarks_explain_methodology` | Scale, cadence, bands and limits — grounding before any number is quoted. |
+
+### Act — these move the page (5)
+
+| Tool | Effect on screen |
+| --- | --- |
+| `benchmarks_open_category` | Navigates to a category and shows its titles. |
+| `benchmarks_open_title` | Opens a title's detail page and flashes the card. |
+| `benchmarks_set_view` | Sets search, topic, industry, min score, sort, order and grid/table layout. |
+| `benchmarks_compare_in_ui` | Loads 2–5 titles into the comparison page. |
+| `benchmarks_reset_view` | Clears every filter and returns to the overview. |
+
+### Three things worth looking at in the code
+
+1. **One pipeline for agent and human.** `ToolRegistry.invoke()` validates, executes,
+   observes and normalises errors. The WebMCP host calls it; the built-in tool console at
+   `/tools` calls it too. A demo can never drift from real behaviour, and a thrown handler
+   becomes a readable `isError` result instead of an opaque host failure.
+   → [`src/webmcp/kernel/registry.ts`](src/webmcp/kernel/registry.ts)
+
+2. **Forgiving input, honest errors.** Agents send `"3"` for a number and
+   `"a, b"` for an array. The validator coerces those instead of failing, but rejects
+   genuinely wrong input with the accepted values inline — and an unresolved title name
+   comes back as *"did you mean…"* rather than a dead end.
+   → [`src/webmcp/kernel/validate.ts`](src/webmcp/kernel/validate.ts), `suggestTitles()`
+
+3. **Agent activity is visible.** Every call — its arguments, duration and outcome — lands
+   in a live rail in the corner, tagged `AGENT` or `CONSOLE`. An agent quietly operating a
+   page is impossible to trust or debug.
+   → [`src/widgets/AgentRail.vue`](src/widgets/AgentRail.vue)
+
+---
+
+## Architecture
+
+Layered, dependency arrows pointing inward. The domain layer has zero framework imports,
+which is what lets the UI and the tool layer share it without one deforming the other.
+
+```
+src/
+  domain/benchmarks/     pure TS — models, selectors, analytics, repository boundary
+  data/                  the corpus snapshot (79 titles) + integrity assertions
+  stores/                Pinia: corpus, view state, agent telemetry
+  webmcp/
+    kernel/              host adapter · registry · schema validation · result builders
+    tools/               15 tool definitions, grouped read / act
+    useWebMcp.ts         composition root: wires stores + router into the tool context
+  shared/                format helpers and presentational primitives
+  widgets/               composite blocks (title card, filter bar, agent rail)
+  pages/                 route views
+  app/                   shell, router, design tokens
+```
+
+**The load-bearing idea:** an act tool never manipulates the DOM. It writes to
+`useViewStore` — the same store the on-page controls write to — and the UI re-renders.
+`benchmarks_set_view` and the filter bar are two front doors onto one room, so they can
+never disagree.
+
+`BenchmarkRepository` is an interface with a static implementation reading the bundled
+snapshot. Swapping in a live Affogata MCP feed is a one-class change; nothing above it moves.
+
+---
+
+## Running it
+
+Requires Node 20.19+.
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm run typecheck  # vue-tsc, strict
+npm run build      # → dist/
+npm run preview    # serve the production build
+```
+
+### Seeing the tools work
+
+- **With a WebMCP host** — ChatGPT's in-app browser, or Chrome 149+ with
+  `chrome://flags/#enable-webmcp-testing` enabled. Tools register on load; the header badge
+  turns green and reports the count.
+- **Without one** — open `/tools`. The console lists every tool with its schema and
+  one-click examples, and runs it through the identical handler. Nothing about the demo
+  depends on having the flag.
+
+Prompts that exercise both halves of the surface:
+
+- *"Which app lost the most customer goodwill this week, and why?"*
+- *"Open the dating apps category and tell me what all three big players get wrong."*
+- *"Compare Revolut, PayPal and Wise, then put them side by side on screen."*
+- *"Who is being punished for paywalls across every category?"*
+- *"Export the gaming rows and find what correlates with a falling score."*
+
+---
+
+## Deploying to S3
+
+The build is fully static. `dist/` contains a `404.html` copy of `index.html` so history-mode
+deep links work on a plain S3 website bucket with no CloudFront function.
+
+```bash
+npm run build
+
+aws s3 sync dist/ s3://YOUR_BUCKET --delete \
+  --cache-control "public,max-age=31536000,immutable" \
+  --exclude "index.html" --exclude "404.html"
+
+# HTML must not be cached, or visitors keep the old asset manifest
+aws s3 cp dist/index.html s3://YOUR_BUCKET/index.html --cache-control "no-cache"
+aws s3 cp dist/404.html   s3://YOUR_BUCKET/404.html   --cache-control "no-cache"
+```
+
+Set the bucket's static website hosting to **index document `index.html`, error document
+`404.html`**.
+
+Two knobs, both optional (see `.env.example`):
+
+- `VITE_BASE` — set to `/subpath/` when not serving from the bucket root.
+- `VITE_ROUTER_MODE=hash` — for buckets where you cannot configure an error document.
+
+WebMCP requires a secure context, so serve over HTTPS (CloudFront in front of the bucket)
+for tools to register anywhere other than `localhost`.
+
+---
+
+## Verified
+
+- `vue-tsc --noEmit` clean under `strict` + `noUncheckedIndexedAccess`.
+- Dataset integrity asserted at load: 79 titles, 16 categories, 8 industries, no orphan
+  category references.
+- Registration confirmed against a live host: `document.modelContext.getTools()` returns all
+  15 tools, and `executeTool()` round-trips both a read tool and a UI-driving tool.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).

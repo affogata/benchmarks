@@ -1,0 +1,41 @@
+/**
+ * Design tokens lifted from the live Affogata benchmarks page so this app reads as the
+ * same product, not a clone. Dark-first: the surface is near-black and the accent green
+ * carries every positive signal.
+ */
+:root {
+  --ink: #f2f6fa;
+  --ink-2: #c7d2de;
+  --ink-3: #9daec0;
+  --ink-4: #7e8fa3;
+
+  --bg: #05080b;
+  --bg-soft: #0a1016;
+  --bg-card: #0e1620;
+  --bg-raised: #0b1118;
+
+  --line: #1b2735;
+  --line-2: #233140;
+  --line-3: #2a3848;
+
+  --green: #5fbf7f;
+  --green-deep: #6fcf8f;
+  --green-soft: rgba(95, 191, 127, 0.1);
+  --amber: #f6b73c;
+  --red: #f65272;
+  --purple: #d8ccff;
+  --cyan: #2bd9c5;
+
+  --display: 'Work Sans', 'Open Sans', sans-serif;
+  --sans: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+
+  --shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  --wrap: 1440px;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
