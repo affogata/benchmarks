@@ -5,6 +5,8 @@ import { useBenchmarksStore } from '@/stores/benchmarks.store'
 import { useViewStore } from '@/stores/view.store'
 import { bandFor, findTitle, queryTitles, toView, volatility } from '@/domain/benchmarks/selectors'
 import { fmtDelta, fmtRating, fmtScore } from '@/shared/lib/format'
+import Breadcrumbs from '@/shared/ui/Breadcrumbs.vue'
+import type { Crumb } from '@/shared/ui/breadcrumbs'
 import DeltaChip from '@/shared/ui/DeltaChip.vue'
 import Sparkline from '@/shared/ui/Sparkline.vue'
 import StatTile from '@/shared/ui/StatTile.vue'
@@ -33,17 +35,23 @@ const peers = computed(() =>
     ? queryTitles(benchmarks.require(), { categoryId: title.value.category.id, sort: 'score' })
     : [],
 )
+const crumbs = computed<Crumb[]>(() =>
+  title.value
+    ? [
+        { label: 'Benchmarks', to: '/' },
+        { label: title.value.category.shortName, to: `/category/${title.value.category.id}` },
+        { label: title.value.name },
+      ]
+    : [],
+)
+
 const basis = computed(() => (title.value?.cadence === 'version' ? 'previous version' : 'last week'))
 </script>
 
 <template>
   <div v-if="title" class="wrap">
     <header class="page-head">
-      <nav class="crumbs">
-        <RouterLink to="/">Benchmarks</RouterLink><span class="sep">›</span>
-        <RouterLink :to="`/category/${title.category.id}`">{{ title.category.shortName }}</RouterLink>
-        <span class="sep">›</span><span class="current">{{ title.name }}</span>
-      </nav>
+      <Breadcrumbs :items="crumbs" />
 
       <div class="masthead">
         <TitleIcon :title="title" :size="72" />

@@ -143,20 +143,6 @@ img { max-width: 100%; display: block; }
   margin-bottom: 28px;
 }
 
-.crumbs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--ink-4);
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-.crumbs a { color: var(--ink-4); }
-.crumbs a:hover { color: var(--green); }
-.crumbs .sep { color: #3a4756; }
-.crumbs .current { color: var(--green-deep); font-weight: 600; }
-
 .section { padding: 30px 0; }
 
 .grid-cards {

@@ -6,6 +6,7 @@ import { useViewStore } from '@/stores/view.store'
 import { compare } from '@/domain/benchmarks/analytics'
 import { findTitle, queryTitles } from '@/domain/benchmarks/selectors'
 import { fmtDelta, fmtScore } from '@/shared/lib/format'
+import Breadcrumbs from '@/shared/ui/Breadcrumbs.vue'
 import Sparkline from '@/shared/ui/Sparkline.vue'
 import TitleIcon from '@/shared/ui/TitleIcon.vue'
 import TopicTag from '@/shared/ui/TopicTag.vue'
@@ -48,9 +49,7 @@ const formatValue = (key: string, value: number | string | null): string => {
 <template>
   <div class="wrap">
     <header class="page-head">
-      <nav class="crumbs">
-        <RouterLink to="/">Benchmarks</RouterLink><span class="sep">›</span><span class="current">Compare</span>
-      </nav>
+      <Breadcrumbs :items="[{ label: 'Benchmarks', to: '/' }, { label: 'Compare' }]" />
       <h1>Side by side</h1>
       <p class="lede">
         Put up to five titles against each other across score, movement, category position and topic

@@ -7,9 +7,9 @@
  * agent gets, including validation errors.
  */
 import { computed, reactive, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 import { useAgentStore } from '@/stores/agent.store'
 import { useBenchmarksStore } from '@/stores/benchmarks.store'
+import Breadcrumbs from '@/shared/ui/Breadcrumbs.vue'
 import { toolRegistry } from '@/webmcp/kernel/registry'
 import type { JsonSchemaProperty, ToolResult } from '@/webmcp/kernel/types'
 
@@ -70,9 +70,7 @@ const placeholder = (spec: JsonSchemaProperty): string =>
 <template>
   <div class="wrap">
     <header class="page-head">
-      <nav class="crumbs">
-        <RouterLink to="/">Benchmarks</RouterLink><span class="sep">›</span><span class="current">Agent tools</span>
-      </nav>
+      <Breadcrumbs :items="[{ label: 'Benchmarks', to: '/' }, { label: 'Agent tools' }]" />
       <h1>What an agent can do on this page</h1>
       <p class="lede">
         Every tool below is registered with the browser through

@@ -6,6 +6,8 @@ import { useViewStore } from '@/stores/view.store'
 import { categoryAnalytics } from '@/domain/benchmarks/analytics'
 import { findCategory, queryTitles } from '@/domain/benchmarks/selectors'
 import { fmtDelta, fmtScore } from '@/shared/lib/format'
+import Breadcrumbs from '@/shared/ui/Breadcrumbs.vue'
+import type { Crumb } from '@/shared/ui/breadcrumbs'
 import StatTile from '@/shared/ui/StatTile.vue'
 import TitleCard from '@/widgets/TitleCard.vue'
 import TopicTag from '@/shared/ui/TopicTag.vue'
@@ -25,6 +27,16 @@ const industry = computed(() =>
     : null,
 )
 
+// An industry has no page of its own, so its crumb points at the browse page filtered
+// down to that industry — the same state benchmarks_set_view({ industry }) produces.
+const crumbs = computed<Crumb[]>(() => [
+  { label: 'Benchmarks', to: '/' },
+  ...(industry.value
+    ? [{ label: industry.value.name, to: { path: '/browse', query: { industry: industry.value.id } } }]
+    : []),
+  ...(category.value ? [{ label: category.value.shortName }] : []),
+])
+
 // Keep the shared filter state in step, so switching category here and switching it from a
 // tool call leave the app in the same state.
 watch(
@@ -43,11 +55,7 @@ const filterByTopic = (topic: string): void => {
 <template>
   <div v-if="category && stats" class="wrap">
     <header class="page-head">
-      <nav class="crumbs">
-        <RouterLink to="/">Benchmarks</RouterLink><span class="sep">›</span>
-        <span v-if="industry">{{ industry.name }}</span><span class="sep">›</span>
-        <span class="current">{{ category.shortName }}</span>
-      </nav>
+      <Breadcrumbs :items="crumbs" />
       <h1 :style="{ color: category.color }">{{ category.emoji }} {{ category.name }}</h1>
       <p class="lede">
         {{ stats.titleCount }} titles scored on how their {{ category.audience }} actually talk about them.
