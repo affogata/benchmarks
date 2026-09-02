@@ -132,7 +132,7 @@ const basis = computed(() => (title.value?.cadence === 'version' ? 'previous ver
 
       <aside class="side">
         <div class="panel">
-          <div class="mono">Movement · {{ benchmarks.meta?.movementWindow }}</div>
+          <div class="mono">Movement</div>
           <div class="tiles">
             <StatTile
               :value="fmtDelta(title.movement.wow)"

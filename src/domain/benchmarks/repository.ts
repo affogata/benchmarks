@@ -1,8 +1,11 @@
 /**
- * Data access boundary. The app talks to `BenchmarkRepository`, never to the JSON file,
- * so swapping the bundled snapshot for a live Affogata MCP feed is a one-class change.
+ * Data access boundary. The app talks to `BenchmarkRepository`, never to a resource or a
+ * transport, so swapping the public API for another feed is a one-class change.
+ *
+ * The repository's own job is narrow: fetch the corpus and refuse to hand up a broken one.
+ * Everything about *how* it is fetched lives in `@/resources`.
  */
-import raw from '@/data/benchmarks.dataset.json'
+import { benchmarksApi, type BenchmarksApi } from '@/resources'
 import type { Dataset } from './models'
 
 export interface BenchmarkRepository {
@@ -25,13 +28,29 @@ export function assertDataset(value: unknown): asserts value is Dataset {
   if (orphan) throw new Error(`Title "${orphan.id}" points at unknown category "${orphan.categoryId}"`)
 }
 
-/** Reads the snapshot compiled into the bundle. No network, so it works offline. */
-export class StaticBenchmarkRepository implements BenchmarkRepository {
+/**
+ * Assembles the corpus from the four entity endpoints, then asserts it before releasing it.
+ *
+ * The requests are issued together rather than in sequence, so the boot cost is one round
+ * trip, not four. `Promise.all` also gives the right failure behaviour: every part is
+ * required to make a `Dataset`, so the first rejection is the one worth reporting — and the
+ * `ApiError` it carries names the endpoint that actually failed.
+ */
+export class HttpBenchmarkRepository implements BenchmarkRepository {
+  constructor(private readonly api: BenchmarksApi = benchmarksApi) {}
+
   async load(): Promise<Dataset> {
-    const dataset = raw as unknown
+    const [meta, industries, categories, titles] = await Promise.all([
+      this.api.meta.get(),
+      this.api.industries.list(),
+      this.api.categories.list(),
+      this.api.titles.list(),
+    ])
+
+    const dataset = { meta, industries, categories, titles }
     assertDataset(dataset)
     return dataset
   }
 }
 
-export const benchmarkRepository: BenchmarkRepository = new StaticBenchmarkRepository()
+export const benchmarkRepository: BenchmarkRepository = new HttpBenchmarkRepository()

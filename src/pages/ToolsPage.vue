@@ -97,7 +97,7 @@ const placeholder = (spec: JsonSchemaProperty): string =>
       </div>
       <div>
         <span class="mono">Dataset</span>
-        <b>{{ benchmarks.titles.length }} titles · {{ benchmarks.meta?.reportWeek.label }}</b>
+        <b>{{ benchmarks.titles.length }} titles</b>
       </div>
     </section>
 

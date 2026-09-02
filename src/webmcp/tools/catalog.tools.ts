@@ -78,9 +78,9 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
       )
 
       return ok(
-        `${rows.length} ${scope ? `${scope.name} ` : ''}categories, ${dataset.meta.reportWeek.label}.\n\n${table}`,
+        `${rows.length} ${scope ? `${scope.name} ` : ''}categories.\n\n${table}`,
         {
-          data: { reportWeek: dataset.meta.reportWeek, categories: rows },
+          data: { categories: rows },
           nextSteps: [
             'benchmarks_list_titles({ category })',
             'benchmarks_open_category({ category }) to show it on screen',
@@ -172,7 +172,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
 
       const scope = resolvedCategory?.name ?? resolvedIndustry?.name ?? 'all industries'
       return ok(
-        `${rows.length} title(s) in ${scope}, sorted by ${sort ?? 'score'} — ${dataset.meta.reportWeek.label}.\n\n${table}`,
+        `${rows.length} title(s) in ${scope}, sorted by ${sort ?? 'score'}.\n\n${table}`,
         {
           data: {
             scope,
@@ -244,7 +244,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
         `Gaining: ${view.gaining.join(', ')}`,
         `Slipping: ${view.slipping.join(', ')}`,
         '',
-        `Movement (${dataset.meta.movementWindow}): ${fmtDelta(movement.wow)} week over week, #${movement.rank} ${movement.rankKind} of ${movement.pool}.`,
+        `Movement: ${fmtDelta(movement.wow)} week over week, #${movement.rank} ${movement.rankKind} of ${movement.pool}.`,
         `Category: ${fmtDelta(movement.vsCategoryAvg)} vs the ${fmtScore(movement.categoryAvg)} average; ${
           movement.isLeader
             ? 'this title leads its category.'

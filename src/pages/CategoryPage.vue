@@ -50,8 +50,7 @@ const filterByTopic = (topic: string): void => {
       </nav>
       <h1 :style="{ color: category.color }">{{ category.emoji }} {{ category.name }}</h1>
       <p class="lede">
-        {{ stats.titleCount }} titles scored on how their {{ category.audience }} actually talk about them,
-        {{ benchmarks.meta?.reportWeek.label }}.
+        {{ stats.titleCount }} titles scored on how their {{ category.audience }} actually talk about them.
       </p>
     </header>
 

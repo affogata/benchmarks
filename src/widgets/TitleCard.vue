@@ -94,7 +94,7 @@ const isHighlighted = computed(() => view.highlighted === props.title.id)
     </div>
 
     <section v-if="isOpen" class="drill">
-      <div class="mono drill-label">Movement · {{ benchmarks.meta?.movementWindow }}</div>
+      <div class="mono drill-label">Movement</div>
       <div class="drill-grid">
         <div class="dst">
           <b>{{ fmtScore(title.movement.thisWeek) }}</b><span class="mono">this week</span>

@@ -2,10 +2,8 @@
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useAgentStore } from '@/stores/agent.store'
-import { useBenchmarksStore } from '@/stores/benchmarks.store'
 
 const agent = useAgentStore()
-const benchmarks = useBenchmarksStore()
 const open = ref(false)
 </script>
 
@@ -28,10 +26,6 @@ const open = ref(false)
           {{ agent.connected ? `WebMCP live · ${agent.registeredCount} tools` : 'WebMCP ready · console' }}
         </RouterLink>
       </nav>
-    </div>
-    <div v-if="benchmarks.meta" class="ticker wrap">
-      <span class="mono">{{ benchmarks.meta.reportWeek.label }} · {{ benchmarks.meta.reportWeek.range }}</span>
-      <span class="mono">{{ benchmarks.meta.totals.titles }} titles · {{ benchmarks.meta.totals.categories }} categories · {{ benchmarks.meta.cadence }}</span>
     </div>
   </header>
 </template>
@@ -67,17 +61,6 @@ const open = ref(false)
 .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .status.live .dot { box-shadow: 0 0 0 3px rgba(95, 191, 127, 0.18); }
 
-.ticker {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding-top: 6px;
-  padding-bottom: 6px;
-  border-top: 1px solid var(--line);
-  font-size: 10px;
-}
-.ticker .mono { font-size: 10px; }
-
 .burger { display: none; margin-left: auto; border: 1.5px solid var(--line-2); border-radius: 7px; padding: 6px 10px; color: var(--ink); }
 
 @media (max-width: 900px) {
@@ -96,6 +79,5 @@ const open = ref(false)
     border-bottom: 1px solid var(--line);
   }
   .links.open { display: flex; }
-  .ticker { flex-direction: column; gap: 2px; }
 }
 </style>

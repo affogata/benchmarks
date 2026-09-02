@@ -23,7 +23,6 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
       const { distribution: dist } = stats
 
       const lines = [
-        `Affogata Benchmarks — ${dataset.meta.reportWeek.label} (${dataset.meta.reportWeek.range}).`,
         `${stats.titleCount} titles across ${stats.categoryCount} categories and ${stats.industryCount} industries. Corpus average ${fmtScore(stats.average)}, median ${fmtScore(stats.median)}.`,
         `Distribution: ${dist.strong} strong (7+), ${dist.mixed} mixed (4-7), ${dist.critical} critical (under 4).`,
         '',
@@ -42,7 +41,6 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
 
       return ok(lines.join('\n'), {
         data: {
-          reportWeek: dataset.meta.reportWeek,
           totals: dataset.meta.totals,
           average: stats.average,
           median: stats.median,
@@ -203,7 +201,7 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
           : `${worst.title.name} gained the most (${fmtDelta(worst.wow)}), driven by ${worst.title.gaining.slice(0, 2).join(' and ').toLowerCase()}.`
 
       return ok(
-        `Top ${rows.length} ${which}${found ? ` in ${found.name}` : ''} — ${dataset.meta.movementWindow}.\n${headline}\n\n${table}`,
+        `Top ${rows.length} ${which}${found ? ` in ${found.name}` : ''}.\n${headline}\n\n${table}`,
         {
           data: {
             direction: which,
@@ -400,12 +398,11 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
       }))
 
       return ok(
-        `Exported ${rows.length} rows for ${dataset.meta.reportWeek.label}. Fields: ${Object.keys(rows[0] ?? {}).join(', ')}. The JSON payload is attached as structured content; scoring scale is ${dataset.meta.scale.min}-${dataset.meta.scale.max} (${dataset.meta.scale.name}).`,
+        `Exported ${rows.length} rows. Fields: ${Object.keys(rows[0] ?? {}).join(', ')}. The JSON payload is attached as structured content; scoring scale is ${dataset.meta.scale.min}-${dataset.meta.scale.max} (${dataset.meta.scale.name}).`,
         {
           data: {
             meta: {
               source: dataset.meta.source,
-              reportWeek: dataset.meta.reportWeek,
               scale: dataset.meta.scale,
               disclaimer: dataset.meta.disclaimer,
             },
@@ -423,7 +420,7 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
     title: 'Explain methodology',
     group: 'read',
     description:
-      'Explain what the score means, where the data comes from, what the score bands are, how often it updates, and what its limits are. Call this before presenting any number to a user so the framing is accurate.',
+      'Explain what the score means, where the data comes from, what the score bands are, and what its limits are. Call this before presenting any number to a user so the framing is accurate.',
     annotations: { readOnlyHint: true },
     inputSchema: { type: 'object', properties: {} },
     examples: [{ label: 'How is this scored?', input: {} }],
@@ -434,7 +431,6 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
         `${meta.scale.name} score, ${meta.scale.min}-${meta.scale.max}. ${meta.scale.description}`,
         '',
         `Coverage: ${meta.totals.titles} titles, ${meta.totals.categories} categories, ${meta.totals.industries} industries.`,
-        `Cadence: ${meta.cadence}. Current report is ${meta.reportWeek.label} (${meta.reportWeek.range}); movement figures compare ${meta.movementWindow}.`,
         '',
         `Bands: ${meta.bands.map((band) => `${band.label} ${band.min}-${band.max}`).join(', ')}.`,
         'Titles shipping frequent releases are scored per version; the rest are scored per week. The "Δ release" figure always means "against the previous point of that cadence".',

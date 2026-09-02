@@ -64,10 +64,6 @@ const PROMPTS = [
           <RouterLink class="btn btn-primary" to="/browse">Browse all {{ dataset.meta.totals.titles }} titles →</RouterLink>
           <RouterLink class="btn btn-ghost" to="/tools">⚡ See the agent tools</RouterLink>
         </div>
-        <p class="mono week">
-          Report week: <b>{{ dataset.meta.reportWeek.label }}</b> · {{ dataset.meta.reportWeek.range }} ·
-          {{ dataset.meta.cadence }}
-        </p>
       </div>
 
       <aside class="hero-side panel">
@@ -214,8 +210,6 @@ h1 { max-width: 16ch; }
 .accent { color: var(--green); }
 .hero .lede { margin-top: 14px; }
 .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
-.week { margin-top: 14px; font-size: 10.5px; }
-.week b { color: var(--green-deep); }
 
 .hero-side h3 { font-size: 16px; margin-bottom: 6px; }
 .side-note { font-size: 13px; color: var(--ink-3); }
