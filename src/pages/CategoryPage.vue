@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useBenchmarksStore } from '@/stores/benchmarks.store'
 import { useViewStore } from '@/stores/view.store'
 import { categoryAnalytics } from '@/domain/benchmarks/analytics'
@@ -15,6 +15,7 @@ import TopicTag from '@/shared/ui/TopicTag.vue'
 const props = defineProps<{ categoryId: string }>()
 const benchmarks = useBenchmarksStore()
 const view = useViewStore()
+const router = useRouter()
 
 const category = computed(() => findCategory(benchmarks.require(), props.categoryId) ?? null)
 const stats = computed(() => (category.value ? categoryAnalytics(benchmarks.require(), category.value) : null))
@@ -47,8 +48,13 @@ watch(
   { immediate: true },
 )
 
+// This page always shows the whole category, so a topic filter has nowhere to land here:
+// writing it to the store changed nothing on screen and then quietly narrowed the next
+// visit to Browse. Hand off to the page that does render the filter, scoped to this
+// category, which is also what benchmarks_set_view({ topic }) produces.
 const filterByTopic = (topic: string): void => {
-  view.patch({ topic })
+  if (!category.value) return
+  void router.push({ path: '/browse', query: { category: category.value.id, topic } })
 }
 </script>
 

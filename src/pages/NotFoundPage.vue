@@ -7,7 +7,7 @@ import { RouterLink } from 'vue-router'
     <h1>Page not found</h1>
     <p class="lede">
       That route does not exist. <RouterLink to="/">Back to the benchmarks</RouterLink> or
-      <RouterLink to="/browse">browse all 79 titles</RouterLink>.
+      <RouterLink to="/browse">browse every title</RouterLink>.
     </p>
   </div>
 </template>

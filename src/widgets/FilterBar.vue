@@ -10,7 +10,7 @@ const view = useViewStore()
 
 const SORT_LABELS: Record<SortKey, string> = {
   score: 'Impact score',
-  delta: 'Change on release',
+  delta: 'Change on latest point',
   momentum: 'Weekly momentum',
   volatility: 'Volatility',
   name: 'Name',

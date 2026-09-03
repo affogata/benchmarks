@@ -4,7 +4,8 @@ import { fail, ok } from '../kernel/result'
 import type { ToolSpec } from '../kernel/types'
 import type { ToolContext } from './context'
 import { categoryAnalytics, compare, movers, overview } from '@/domain/benchmarks/analytics'
-import { findCategory, findIndustry, findTitle, queryTitles, suggestTitles } from '@/domain/benchmarks/selectors'
+import type { Title } from '@/domain/benchmarks/models'
+import { distinctTitles, findCategory, findIndustry, findTitle, queryTitles, suggestTitles } from '@/domain/benchmarks/selectors'
 import { fmtDelta, fmtScore, textTable } from '@/shared/lib/format'
 
 export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
@@ -13,7 +14,7 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
     title: 'Corpus overview',
     group: 'read',
     description:
-      'Headline state of the whole benchmark: how many titles are strong, mixed or critical this week, the happiest and unhappiest customer bases, the biggest weekly mover, and the topics rising and falling across all 79 titles.',
+      'Headline state of the whole benchmark: how many titles are strong, mixed or critical this week, the happiest and unhappiest customer bases, the biggest weekly mover, and the topics rising and falling across the whole corpus.',
     annotations: { readOnlyHint: true },
     inputSchema: { type: 'object', properties: {} },
     examples: [{ label: 'This week at a glance', input: {} }],
@@ -249,7 +250,7 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
     ],
     handler: ({ titles }) => {
       const dataset = ctx.dataset()
-      const resolved = []
+      const resolved: Title[] = []
       const missing: string[] = []
 
       for (const ref of titles) {
@@ -269,9 +270,17 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
           'Call benchmarks_list_titles to see valid ids.',
         ])
       }
-      if (resolved.length < 2) return fail('Give at least two distinct titles to compare.')
 
-      const result = compare(dataset, resolved)
+      // Dedupe before the count, not after: ["paypal", "paypal"] is one title, and a
+      // comparison of a title with itself is a table of zeroes dressed up as a finding.
+      const unique = distinctTitles(resolved)
+      if (unique.length < 2) {
+        return fail('Give at least two distinct titles to compare.', [
+          `Resolved to: ${unique.map((item) => item.name).join(', ') || 'nothing'}.`,
+        ])
+      }
+
+      const result = compare(dataset, unique)
       const table = textTable(
         ['Metric', ...result.titles.map((view) => view.name)],
         result.metrics.map((metric) => [
@@ -344,7 +353,7 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
       properties: {
         category: { type: 'string', description: 'Optional category id or name.' },
         industry: { type: 'string', description: 'Optional industry name.' },
-        limit: { type: 'integer', minimum: 1, maximum: 79, default: 79, description: 'Maximum rows.' },
+        limit: { type: 'integer', minimum: 1, description: 'Maximum rows. Omit for the whole corpus.' },
         include_history: {
           type: 'boolean',
           default: true,
@@ -376,7 +385,7 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
         ...(found ? { categoryId: found.id } : {}),
         ...(scopeIndustry ? { industryId: scopeIndustry.id } : {}),
         sort: 'score',
-        limit: limit ?? 79,
+        ...(typeof limit === 'number' ? { limit } : {}),
       }).map((view) => ({
         id: view.id,
         name: view.name,
@@ -385,7 +394,7 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
         categoryId: view.category.id,
         industry: view.industry.name,
         score: view.score,
-        deltaOnRelease: view.delta,
+        delta: view.delta,
         cadence: view.cadence,
         weekOverWeek: view.movement.wow,
         vsCategoryAvg: view.movement.vsCategoryAvg,
@@ -433,7 +442,7 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
         `Coverage: ${meta.totals.titles} titles, ${meta.totals.categories} categories, ${meta.totals.industries} industries.`,
         '',
         `Bands: ${meta.bands.map((band) => `${band.label} ${band.min}-${band.max}`).join(', ')}.`,
-        'Titles shipping frequent releases are scored per version; the rest are scored per week. The "Δ release" figure always means "against the previous point of that cadence".',
+        'Titles shipping frequent releases are scored per version; the rest are scored per week. Each title carries its own `cadence`, and its `delta` always means "against the previous point of that cadence" — a release for one title, a week for another. Do not describe it as a release change without checking the cadence.',
         '',
         `Limits: ${meta.disclaimer}`,
         `Source of record: ${meta.source}`,

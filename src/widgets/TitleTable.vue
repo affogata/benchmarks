@@ -22,7 +22,11 @@ const bandClass = (score: number): string => `band-${bandFor(benchmarks.meta?.ba
           <th>Title</th>
           <th>Category</th>
           <th class="num">Score</th>
-          <th class="num">Δ release</th>
+          <!-- Not "Δ release": half the corpus is scored per week, and this column carries
+               whichever cadence the row uses. -->
+          <th class="num" title="Change against the previous version, or the previous week for weekly-cadence titles">
+            Δ latest
+          </th>
           <th class="num">Δ week</th>
           <th class="num">vs avg</th>
           <th>Top complaint</th>

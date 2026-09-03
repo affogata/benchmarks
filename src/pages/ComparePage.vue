@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useBenchmarksStore } from '@/stores/benchmarks.store'
 import { useViewStore } from '@/stores/view.store'
@@ -16,16 +16,25 @@ const view = useViewStore()
 const route = useRoute()
 
 // A deep link (?titles=a,b,c) is how `benchmarks_compare_in_ui` hands off to this page.
-onMounted(() => {
-  const param = route.query.titles
-  const raw = Array.isArray(param) ? param.join(',') : param
-  if (!raw) return
-  const ids = String(raw)
-    .split(',')
-    .map((ref) => findTitle(benchmarks.require(), ref.trim())?.id)
-    .filter((id): id is string => Boolean(id))
-  if (ids.length) view.setComparison(ids)
-})
+// Watched rather than read once at mount: the query can change while this page stays
+// mounted, and the selection would otherwise contradict the URL that produced it.
+//
+// No `titles` at all means "show whatever is in the comparison tray". A `titles` that
+// resolves to nothing means an empty selection — the honest "pick at least two" state,
+// not a leftover comparison the link never asked for.
+watch(
+  () => route.query.titles,
+  (param) => {
+    if (param === undefined) return
+    const raw = Array.isArray(param) ? param.join(',') : String(param ?? '')
+    const ids = raw
+      .split(',')
+      .map((ref) => findTitle(benchmarks.require(), ref.trim())?.id)
+      .filter((id): id is string => Boolean(id))
+    view.setComparison(ids)
+  },
+  { immediate: true },
+)
 
 const selected = computed(() =>
   view.comparison

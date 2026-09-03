@@ -22,7 +22,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
     title: 'List categories',
     group: 'read',
     description:
-      'List every benchmark category (16 across 8 industries) with its title count, average customer-voice score and current leader. Start here when you do not yet know which category a brand belongs to.',
+      'List every benchmark category with its industry, title count, average customer-voice score and current leader. Start here when you do not yet know which category a brand belongs to.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -30,7 +30,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
         industry: {
           type: 'string',
           description:
-            'Optional industry filter, e.g. "Gaming", "Fintech", "Travel & Mobility". Omit for all 16 categories.',
+            'Optional industry filter, e.g. "Gaming", "Fintech", "Travel & Mobility". Omit for every category.',
         },
       },
     },
@@ -96,13 +96,14 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
     search?: string
     min_score?: number
     sort?: SortKey
+    order?: 'asc' | 'desc'
     limit?: number
   }>({
     name: 'benchmarks_list_titles',
     title: 'List titles',
     group: 'read',
     description:
-      'List benchmarked games and apps with their current score, change on the latest release and week-over-week move. Filter by category, industry, free text or minimum score, and sort by score, delta, momentum or volatility.',
+      'List benchmarked games and apps with their current score, the change on their latest scored point (a release or a week, per the title cadence) and their week-over-week move. Filter by category, industry, free text or minimum score, sort by score, delta, momentum or volatility, and set the direction.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -116,17 +117,23 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
           enum: SORT_KEYS,
           default: 'score',
           description:
-            'score = current impact, delta = change on latest release, momentum = size of the weekly move, volatility = spread across the tracked window.',
+            'score = current impact, delta = change on the latest release or week, momentum = size of the weekly move, volatility = spread across the tracked window.',
         },
-        limit: { type: 'integer', minimum: 1, maximum: 79, default: 20, description: 'Maximum rows to return.' },
+        order: {
+          type: 'string',
+          enum: ['asc', 'desc'],
+          description:
+            'asc = lowest first, which is how you ask for the worst scores. Defaults to highest first for every sort key except name and category.',
+        },
+        limit: { type: 'integer', minimum: 1, default: 20, description: 'Maximum rows to return.' },
       },
     },
     examples: [
-      { label: 'Worst-scoring 10', input: { sort: 'score', limit: 10 } },
+      { label: 'Worst-scoring 10', input: { sort: 'score', order: 'asc', limit: 10 } },
       { label: 'Fintech leaders', input: { industry: 'Fintech', limit: 11 } },
       { label: 'Search "paywall"', input: { search: 'paywall' } },
     ],
-    handler: ({ category, industry, search, min_score, sort, limit }) => {
+    handler: ({ category, industry, search, min_score, sort, order, limit }) => {
       const dataset = ctx.dataset()
 
       const resolvedCategory = category ? findCategory(dataset, category) : null
@@ -148,6 +155,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
         ...(search ? { search } : {}),
         ...(typeof min_score === 'number' ? { minScore: min_score } : {}),
         sort: sort ?? 'score',
+        ...(order ? { order } : {}),
         limit: limit ?? 20,
       })
 
@@ -159,7 +167,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
       }
 
       const table = textTable(
-        ['title_id', 'Title', 'Category', 'Score', 'Δ release', 'Δ week'],
+        ['title_id', 'Title', 'Category', 'Score', 'Δ latest', 'Δ week'],
         rows.map((row) => [
           row.id,
           row.name,
@@ -171,19 +179,24 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
       )
 
       const scope = resolvedCategory?.name ?? resolvedIndustry?.name ?? 'all industries'
+      const direction = order ?? (sort === 'name' || sort === 'category' ? 'asc' : 'desc')
       return ok(
-        `${rows.length} title(s) in ${scope}, sorted by ${sort ?? 'score'}.\n\n${table}`,
+        `${rows.length} title(s) in ${scope}, sorted by ${sort ?? 'score'} ${direction}.\n` +
+          'Δ latest is measured against the previous version for titles scored per version, ' +
+          `and against the previous week for the rest.\n\n${table}`,
         {
           data: {
             scope,
             sort: sort ?? 'score',
+            order: direction,
             titles: rows.map((row) => ({
               id: row.id,
               name: row.name,
               publisher: row.publisher,
               category: row.category.name,
               score: row.score,
-              deltaOnRelease: row.delta,
+              delta: row.delta,
+              cadence: row.cadence,
               weekOverWeek: row.movement.wow,
               gaining: row.gaining,
               slipping: row.slipping,
@@ -224,7 +237,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
         return fail(`No benchmarked title matches "${title}".`, [
           suggestions.length
             ? `Did you mean: ${suggestions.map((item) => item.name).join(', ')}?`
-            : 'Call benchmarks_list_titles to see all 79 tracked titles.',
+            : 'Call benchmarks_list_titles to see every tracked title.',
         ])
       }
 
@@ -270,7 +283,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
           category: { id: view.category.id, name: view.category.name },
           industry: view.industry.name,
           score: view.score,
-          deltaOnRelease: view.delta,
+          delta: view.delta,
           cadence: view.cadence,
           storeRating: view.storeRating,
           release: view.release,
@@ -295,7 +308,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
     title: 'Find titles by topic',
     group: 'read',
     description:
-      'Search the topic clusters across all 79 titles to find who is being praised or punished for a given theme — "paywall", "support", "ads", "bugs", "pay to win". This is the cross-category view a per-brand lookup cannot give you.',
+      'Search the topic clusters across every benchmarked title to find who is being praised or punished for a given theme — "paywall", "support", "ads", "bugs", "pay to win". This is the cross-category view a per-brand lookup cannot give you.',
     annotations: { readOnlyHint: true, untrustedContentHint: true },
     inputSchema: {
       type: 'object',
@@ -307,7 +320,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
           default: 'both',
           description: 'gaining = praised for it, slipping = punished for it.',
         },
-        limit: { type: 'integer', minimum: 1, maximum: 79, default: 25, description: 'Maximum rows.' },
+        limit: { type: 'integer', minimum: 1, default: 25, description: 'Maximum rows.' },
       },
       required: ['topic'],
     },
@@ -320,6 +333,9 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
       const which = side ?? 'both'
       const needle = topic.toLowerCase()
 
+      // Every match, counted and averaged before the limit is applied: "12 titles, average
+      // 5.1" has to describe the topic, not the lowest-scoring handful that fits in the
+      // table. Truncation is presentation, and it happens after the arithmetic.
       const matches = dataset.titles
         .map((item) => {
           const gaining = item.gaining.filter((cluster) => cluster.toLowerCase().includes(needle))
@@ -334,7 +350,8 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
               : row.gaining.length || row.slipping.length,
         )
         .sort((a, b) => a.title.score - b.title.score)
-        .slice(0, limit ?? 25)
+
+      const shown = matches.slice(0, limit ?? 25)
 
       if (!matches.length) {
         return ok(`No topic cluster mentions "${topic}".`, {
@@ -345,7 +362,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
 
       const table = textTable(
         ['title_id', 'Title', 'Category', 'Score', 'Matched clusters'],
-        matches.map((row) => [
+        shown.map((row) => [
           row.title.id,
           row.title.name,
           row.title.category.shortName,
@@ -360,16 +377,22 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
       const averageScore =
         Math.round((matches.reduce((sum, row) => sum + row.title.score, 0) / matches.length) * 10) / 10
 
+      const truncated = matches.length - shown.length
       return ok(
         `${matches.length} title(s) where customers talk about "${topic}" (${which}). Their average score is ${fmtScore(averageScore)} against a corpus average of ${fmtScore(
           Math.round((dataset.titles.reduce((sum, item) => sum + item.score, 0) / dataset.titles.length) * 10) / 10,
-        )}.\n\n${table}`,
+        )}.` +
+          (truncated
+            ? ` Showing the ${shown.length} lowest-scoring; raise limit to see the other ${truncated}.`
+            : '') +
+          `\n\n${table}`,
         {
           data: {
             topic,
             side: which,
+            matchCount: matches.length,
             averageScore,
-            matches: matches.map((row) => ({
+            matches: shown.map((row) => ({
               id: row.title.id,
               name: row.title.name,
               category: row.title.category.name,

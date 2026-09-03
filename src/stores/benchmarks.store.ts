@@ -10,19 +10,34 @@ export const useBenchmarksStore = defineStore('benchmarks', () => {
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const error = ref<string | null>(null)
 
-  async function load(): Promise<Dataset> {
-    if (dataset.value) return dataset.value
+  /**
+   * The in-flight fetch is held, not just the result: the shell and the WebMCP ready gate
+   * both call this during boot, and without it the corpus would be fetched twice.
+   */
+  let pending: Promise<Dataset> | null = null
+
+  function load(): Promise<Dataset> {
+    if (dataset.value) return Promise.resolve(dataset.value)
+    if (pending) return pending
+
     status.value = 'loading'
-    try {
-      const loaded = await benchmarkRepository.load()
-      dataset.value = loaded
-      status.value = 'ready'
-      return loaded
-    } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : String(cause)
-      status.value = 'error'
-      throw cause
-    }
+    pending = benchmarkRepository
+      .load()
+      .then((loaded) => {
+        dataset.value = loaded
+        status.value = 'ready'
+        return loaded
+      })
+      .catch((cause: unknown) => {
+        error.value = cause instanceof Error ? cause.message : String(cause)
+        status.value = 'error'
+        throw cause
+      })
+      .finally(() => {
+        pending = null
+      })
+
+    return pending
   }
 
   /** Non-null accessor for code that runs after `load()` — i.e. everything under the router. */

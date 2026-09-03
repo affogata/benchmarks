@@ -178,23 +178,25 @@ export function compare(dataset: Dataset, titles: Title[]): Comparison {
     const scored = values.filter(
       (entry): entry is { titleId: string; value: number } => typeof entry.value === 'number',
     )
-    const best = scored.length
-      ? scored.reduce((winner, entry) =>
-          higherIsBetter
-            ? entry.value > winner.value
-              ? entry
-              : winner
-            : entry.value < winner.value
-              ? entry
-              : winner,
-        ).titleId
+
+    // A tie has no winner. Marking the first of two identical scores as "best" is a claim
+    // the numbers do not support, and it is the row the UI puts a badge on.
+    const target = scored.length
+      ? scored.reduce(
+          (winner, entry) =>
+            higherIsBetter ? Math.max(winner, entry.value) : Math.min(winner, entry.value),
+          scored[0]!.value,
+        )
       : null
+    const winners = scored.filter((entry) => entry.value === target)
+    const best = winners.length === 1 ? winners[0]!.titleId : null
+
     return { key, label, values, best }
   }
 
   const metrics: ComparisonMetric[] = [
     numeric('score', 'Impact score', (view) => view.score),
-    numeric('delta', 'Change on current release', (view) => view.delta),
+    numeric('delta', 'Change on latest point', (view) => view.delta),
     numeric('wow', 'Week over week', (view) => view.movement.wow),
     numeric('vsCategoryAvg', 'vs category average', (view) => view.movement.vsCategoryAvg),
     numeric('vsLeader', 'vs category leader', (view) => view.movement.vsLeader),
@@ -234,11 +236,13 @@ export function compare(dataset: Dataset, titles: Title[]): Comparison {
   const ranked = [...views].sort((a, b) => b.score - a.score)
   const top = ranked[0]
   const bottom = ranked[ranked.length - 1]
+  // "Both" is only true of a pair; three to five titles need a different subject.
+  const subject = views.length === 2 ? 'Both are' : 'All of them are'
   const verdict =
     top && bottom && top.id !== bottom.id
       ? `${top.name} leads at ${top.score.toFixed(1)}, ${round1(top.score - bottom.score)} ahead of ${bottom.name} at ${bottom.score.toFixed(1)}.` +
         (sharedSlipping.length
-          ? ` Both are dragged by ${sharedSlipping.join(' and ').toLowerCase()}.`
+          ? ` ${subject} dragged by ${sharedSlipping.join(' and ').toLowerCase()}.`
           : '')
       : top
         ? `${top.name} scores ${top.score.toFixed(1)}.`

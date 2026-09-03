@@ -82,12 +82,24 @@ export function validateInput(schema: JsonSchema, input: unknown): ValidationRes
   const value: Record<string, unknown> = {}
 
   for (const [key, spec] of Object.entries(schema.properties)) {
-    const raw = source[key]
-    const missing = raw === undefined || raw === null || raw === ''
+    // Trim before the presence check, not after it. `{ topic: "   " }` is a missing topic,
+    // and letting it through as `""` would be worse than rejecting it: `"".includes()`
+    // matches every cluster, so the tool would answer a search nobody made.
+    const supplied = source[key]
+    const raw = typeof supplied === 'string' ? supplied.trim() : supplied
+    const blank = raw === undefined || raw === null || raw === ''
 
-    if (missing) {
+    if (blank) {
       if (schema.required?.includes(key)) {
         errors.push(`"${key}" is required — ${spec.description ?? spec.type}`)
+        continue
+      }
+      // On an optional free-text property, an explicit "" is a value rather than an
+      // omission: several tools document it as the way to clear a filter, and dropping it
+      // here meant the documented clear silently did nothing. A property with an `enum` is
+      // excluded — "" is not one of its options.
+      if (raw === '' && spec.type === 'string' && !spec.enum) {
+        value[key] = ''
         continue
       }
       if (spec.default !== undefined) value[key] = spec.default

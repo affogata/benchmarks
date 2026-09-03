@@ -20,36 +20,31 @@ const single = (value: unknown): string | null => {
 }
 
 // Deep links (?industry=gaming, ?category=travel-apps, ?topic=ads, ?search=…) land in the
-// same store the on-page controls write to, so a breadcrumb or an agent link arrives with
-// the filters already applied.
+// same store the on-page controls write to, so a breadcrumb, a shared link or an agent
+// hand-off arrives with the filters already applied.
+//
+// Every change rebuilds all four of them, clearing whatever the URL no longer carries.
+// Patching only the parameters that are present left /browse?industry=gaming&topic=ads
+// still filtered after a plain /browse navigation — the page showing one thing and its own
+// address bar claiming another. `benchmarks_set_view` puts these four in the URL for the
+// same reason.
 watch(
   () => route.query,
   (query) => {
     const dataset = benchmarks.require()
     const industry = single(query.industry)
     const category = single(query.category)
-    const topic = single(query.topic)
-    const search = single(query.search)
 
-    const patch: Parameters<typeof view.patch>[0] = {}
-    if (industry) {
-      const found = findIndustry(dataset, industry)
-      if (found) {
-        patch.industryId = found.id
-        patch.categoryId = null
-      }
-    }
-    if (category) {
-      const found = findCategory(dataset, category)
-      if (found) {
-        patch.categoryId = found.id
-        patch.industryId = null
-      }
-    }
-    if (topic) patch.topic = topic
-    if (search) patch.search = search
+    const foundCategory = category ? findCategory(dataset, category) : undefined
+    const foundIndustry = industry ? findIndustry(dataset, industry) : undefined
 
-    if (Object.keys(patch).length) view.patch(patch)
+    view.patch({
+      // A category is the narrower of the two, so it wins if the URL somehow carries both.
+      categoryId: foundCategory?.id ?? null,
+      industryId: foundCategory ? null : foundIndustry?.id ?? null,
+      topic: single(query.topic),
+      search: single(query.search) ?? '',
+    })
   },
   { immediate: true },
 )

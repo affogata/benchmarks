@@ -9,7 +9,9 @@ import { defineTool } from '../kernel/defineTool'
 import { fail, ok } from '../kernel/result'
 import type { ToolSpec } from '../kernel/types'
 import type { ToolContext } from './context'
+import type { Title } from '@/domain/benchmarks/models'
 import {
+  distinctTitles,
   findCategory,
   findIndustry,
   findTitle,
@@ -18,7 +20,27 @@ import {
   suggestTitles,
   type SortKey,
 } from '@/domain/benchmarks/selectors'
+import type { ViewFilters } from '@/stores/view.store'
 import { fmtDelta, fmtScore } from '@/shared/lib/format'
+
+/**
+ * The browse page reads category, industry, topic and search back out of the URL and
+ * clears whatever the URL omits, so these four have to travel in it. That is also what
+ * makes the result of a `set_view` call a link the user can share or reload.
+ */
+function browseHref(filters: ViewFilters): string {
+  const pairs: Array<[string, string]> = []
+  if (filters.categoryId) pairs.push(['category', filters.categoryId])
+  else if (filters.industryId) pairs.push(['industry', filters.industryId])
+  if (filters.topic) pairs.push(['topic', filters.topic])
+  if (filters.search) pairs.push(['search', filters.search])
+
+  // encodeURIComponent rather than URLSearchParams: the latter writes a space as "+", and
+  // vue-router hands that back verbatim instead of decoding it, so a two-word search would
+  // arrive as "free+trial".
+  const query = pairs.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&')
+  return query ? `/browse?${query}` : '/browse'
+}
 
 export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> {
   const openCategory = defineTool<{ category: string }>({
@@ -145,7 +167,13 @@ export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> 
         search: { type: 'string', description: 'Free text over name, publisher and topic clusters. Pass "" to clear.' },
         topic: { type: 'string', description: 'Only titles whose clusters mention this topic, e.g. "ads". Pass "" to clear.' },
         industry: { type: 'string', description: 'Industry name, e.g. "Gaming". Pass "" to clear.' },
-        min_score: { type: 'number', minimum: 0, maximum: 10, description: 'Hide titles scoring below this.' },
+        min_score: {
+          type: 'number',
+          minimum: 0,
+          maximum: 10,
+          description:
+            'Hide titles scoring below this. Pass 0 to clear the threshold — no title scores below 0, so 0 and "no threshold" are the same filter, and this is how you drop it without resetting everything else.',
+        },
         sort: { type: 'string', enum: SORT_KEYS, description: 'Sort key for the list.' },
         order: { type: 'string', enum: ['asc', 'desc'], description: 'Sort direction.' },
         mode: { type: 'string', enum: ['grid', 'table'], description: 'Card grid or dense table.' },
@@ -161,7 +189,9 @@ export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> 
 
       if (search !== undefined) patch.search = search
       if (topic !== undefined) patch.topic = topic === '' ? null : topic
-      if (min_score !== undefined) patch.minScore = min_score
+      // 0 excludes nothing, so it is the natural "no threshold" value rather than a
+      // filter that quietly stays on until the whole view is reset.
+      if (min_score !== undefined) patch.minScore = min_score === 0 ? null : min_score
       if (sort !== undefined) patch.sort = sort
       if (order !== undefined) patch.order = order
       if (mode !== undefined) patch.mode = mode
@@ -187,7 +217,7 @@ export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> 
       }
 
       const filters = ctx.view.patch(patch)
-      if (!ctx.currentPath().startsWith('/browse')) ctx.navigate('/browse')
+      ctx.navigate(browseHref(filters))
 
       const matched = queryTitles(dataset, {
         ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
@@ -252,7 +282,7 @@ export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> 
     ],
     handler: ({ titles }) => {
       const dataset = ctx.dataset()
-      const resolved = []
+      const resolved: Title[] = []
       const missing: string[] = []
       for (const ref of titles) {
         const found = findTitle(dataset, ref)
@@ -264,18 +294,26 @@ export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> 
           'Call benchmarks_list_titles to see valid ids.',
         ])
       }
-      if (resolved.length < 2) return fail('Give at least two distinct titles.')
 
-      const ids = resolved.map((item) => item.id)
+      // The store dedupes on the way in, so counting before that would promise the user two
+      // titles on screen while the page renders its "pick at least two" state.
+      const unique = distinctTitles(resolved)
+      if (unique.length < 2) {
+        return fail('Give at least two distinct titles.', [
+          `Resolved to: ${unique.map((item) => item.name).join(', ') || 'nothing'}.`,
+        ])
+      }
+
+      const ids = unique.map((item) => item.id)
       ctx.view.setComparison(ids)
       ctx.navigate(`/compare?titles=${ids.join(',')}`)
 
-      const ranked = [...resolved].sort((a, b) => b.score - a.score)
+      const ranked = [...unique].sort((a, b) => b.score - a.score)
       return ok(
-        `Comparing ${resolved.map((item) => item.name).join(' vs ')} on screen. ${ranked[0]!.name} leads at ${fmtScore(ranked[0]!.score)}.`,
+        `Comparing ${unique.map((item) => item.name).join(' vs ')} on screen. ${ranked[0]!.name} leads at ${fmtScore(ranked[0]!.score)}.`,
         {
           data: { titleIds: ids, route: `/compare?titles=${ids.join(',')}` },
-          uiEffect: `The comparison page now shows ${resolved.length} titles.`,
+          uiEffect: `The comparison page now shows ${unique.length} titles.`,
           nextSteps: ['benchmarks_compare_titles({ titles }) for the full metric breakdown'],
         },
       )
@@ -287,15 +325,16 @@ export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> 
     title: 'Reset the view',
     group: 'act',
     description:
-      'Clear every filter, comparison and highlight and return the page to the full 79-title overview. Use it when the user says "start over" or "show everything again".',
+      'Clear every filter, comparison and highlight and return the page to the full benchmark overview. Use it when the user says "start over" or "show everything again".',
     annotations: { readOnlyHint: false },
     inputSchema: { type: 'object', properties: {} },
     examples: [{ label: 'Start over', input: {} }],
     handler: () => {
+      const { totals } = ctx.dataset().meta
       ctx.view.reset()
       ctx.view.setComparison([])
       ctx.navigate('/')
-      return ok('View reset. Showing all 79 titles across 16 categories.', {
+      return ok(`View reset. Showing all ${totals.titles} titles across ${totals.categories} categories.`, {
         uiEffect: 'The page is back to the full benchmark overview.',
         data: { route: '/' },
       })

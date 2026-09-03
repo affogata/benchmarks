@@ -1,25 +1,33 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { useBenchmarksStore } from '@/stores/benchmarks.store'
 import { useViewStore } from '@/stores/view.store'
 import { useWebMcp } from '@/webmcp/useWebMcp'
 import SiteHeader from '@/widgets/SiteHeader.vue'
 import AgentRail from '@/widgets/AgentRail.vue'
+import CompareTray from '@/widgets/CompareTray.vue'
 
 const benchmarks = useBenchmarksStore()
 const view = useViewStore()
 const route = useRoute()
-const ready = ref(false)
 
-// Wired up synchronously so the tool layer keeps a live router handle; `start()` then waits
-// for the corpus, so an agent never sees a tool that would fail on its first call.
+// Derived from the store, never latched locally: a first load can fail and a later retry —
+// a WebMCP call reaching the ready gate, say — can succeed, and the shell has to follow.
+const ready = computed(() => benchmarks.status === 'ready')
+
+// Wired up synchronously so the tool layer keeps a live router handle.
 const webmcp = useWebMcp()
 
-onMounted(async () => {
-  await benchmarks.load()
-  ready.value = true
-  await webmcp.start()
+onMounted(() => {
+  // Tools go up before the corpus is fetched, not after: a host that reads the tool list on
+  // load must not catch the page mid-request and conclude it offers nothing. The registry's
+  // ready gate holds the first *call* until the data lands.
+  void webmcp.start()
+
+  benchmarks.load().catch(() => {
+    // The store keeps the message; the boot panel below renders it.
+  })
 })
 
 // Scroll a title into view when a tool (or a deep link) highlights it.
@@ -59,7 +67,7 @@ watch(
     </div>
 
     <div v-else class="wrap boot">
-      <p class="mono">Loading 79 titles…</p>
+      <p class="mono">Loading the benchmark corpus…</p>
     </div>
   </main>
 
@@ -73,6 +81,8 @@ watch(
     </div>
   </footer>
 
+  <!-- Both read the corpus on render, so neither mounts before it is loaded. -->
+  <CompareTray v-if="ready" />
   <AgentRail v-if="ready" />
 </template>
 
