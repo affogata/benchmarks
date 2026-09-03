@@ -5,6 +5,7 @@ import type { TitleView } from '@/domain/benchmarks/models'
 import { useBenchmarksStore } from '@/stores/benchmarks.store'
 import { useViewStore } from '@/stores/view.store'
 import { bandFor } from '@/domain/benchmarks/selectors'
+import { accentPalette } from '@/shared/lib/color'
 import { fmtDelta, fmtRating, fmtScore } from '@/shared/lib/format'
 import DeltaChip from '@/shared/ui/DeltaChip.vue'
 import Sparkline from '@/shared/ui/Sparkline.vue'
@@ -27,13 +28,37 @@ const basis = computed(() => (props.title.cadence === 'version' ? 'previous vers
 const isOpen = computed(() => view.expanded.has(props.title.id))
 const inComparison = computed(() => view.comparison.includes(props.title.id))
 const isHighlighted = computed(() => view.highlighted === props.title.id)
+
+// The card carries the title's own colour, the way the published benchmarks page does it:
+// 79 cards that differ at a glance, so the eye can tell them apart before it reads a word.
+const palette = computed(() => accentPalette(props.title.accent))
+
+// The pill's own colours are inline, so they win over any stylesheet rule — the tinted
+// variant has to be chosen here rather than overridden in CSS. Category colour stays as
+// the text (it is a different signal from the title accent); only the plate goes neutral,
+// because a 14%-alpha fill of it disappears against a saturated ground.
+const catPillStyle = computed(() =>
+  palette.value
+    ? { color: props.title.category.color, borderColor: 'rgba(255, 255, 255, 0.28)', background: 'rgba(0, 0, 0, 0.3)' }
+    : {
+        color: props.title.category.color,
+        borderColor: `${props.title.category.color}59`,
+        background: `${props.title.category.color}14`,
+      },
+)
 </script>
 
 <template>
   <article
     class="card vc"
-    :class="{ 'is-highlighted': isHighlighted }"
-    :style="{ '--accent': title.accent }"
+    :class="{ 'is-highlighted': isHighlighted, tinted: !!palette }"
+    :style="{
+      '--accent': title.accent,
+      '--ground': palette?.gradient,
+      '--gink': palette?.ink,
+      '--ginkm': palette?.inkMid,
+      '--gpaper': palette?.paper,
+    }"
     :data-title-id="title.id"
   >
     <header class="head">
@@ -45,11 +70,7 @@ const isHighlighted = computed(() => view.highlighted === props.title.id)
           <template v-if="title.storeRating"> · <b>{{ fmtRating(title.storeRating) }}</b></template>
           <template v-if="title.release"> · {{ title.release }}</template>
         </div>
-        <RouterLink
-          class="cat-pill"
-          :to="`/category/${title.category.id}`"
-          :style="{ color: title.category.color, borderColor: `${title.category.color}59`, background: `${title.category.color}14` }"
-        >
+        <RouterLink class="cat-pill" :to="`/category/${title.category.id}`" :style="catPillStyle">
           {{ title.category.emoji }} {{ title.category.shortName }}
         </RouterLink>
       </div>
@@ -63,7 +84,13 @@ const isHighlighted = computed(() => view.highlighted === props.title.id)
           <DeltaChip :value="title.delta" size="sm" :label="`vs ${basis}`" />
         </div>
       </div>
-      <Sparkline :points="title.history" :stroke="strokeColor" :width="150" :height="44" />
+      <Sparkline
+        :points="title.history"
+        :stroke="strokeColor"
+        :fill="palette ? 'rgba(255, 255, 255, 0.45)' : undefined"
+        :width="150"
+        :height="44"
+      />
     </div>
 
     <ol class="history">
@@ -76,7 +103,7 @@ const isHighlighted = computed(() => view.highlighted === props.title.id)
       </li>
     </ol>
 
-    <p v-if="title.aiRead" class="ai-read"><b>AI read</b>{{ title.aiRead }}</p>
+    <p v-if="title.aiRead" class="ai-read"><b>Affogata insight</b>{{ title.aiRead }}</p>
 
     <div class="trends">
       <div>
@@ -149,6 +176,47 @@ const isHighlighted = computed(() => view.highlighted === props.title.id)
   transition: border-color 0.15s var(--ease), transform 0.15s var(--ease);
 }
 .vc:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+/*
+ * Tinted variant. The ground carries the brand colour, so every block inside it that was
+ * drawn for near-black has to move: headline type goes white, and the small surfaces that
+ * were dark plates on a dark card become pale "paper" with the accent's own dark shades as
+ * ink. Halfway leaves numbers sitting in muddy patches, which is worse than not tinting.
+ */
+.vc.tinted { background: var(--ground); border-color: rgba(0, 0, 0, 0.35); }
+.vc.tinted .name, .vc.tinted .score { color: #fff; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
+.vc.tinted .name:hover { color: #fff; text-decoration: underline; }
+.vc.tinted .meta { color: rgba(255, 255, 255, 0.82); }
+.vc.tinted .meta b { color: #ffd97a; }
+.vc.tinted .score-label { color: rgba(255, 255, 255, 0.85); }
+
+/* Paper chips: the release history and the drill-down tiles. */
+.vc.tinted .history li,
+.vc.tinted .dst { background: var(--gpaper); border-color: rgba(0, 0, 0, 0.22); }
+.vc.tinted .history li.current { outline: 2px solid rgba(255, 255, 255, 0.55); }
+.vc.tinted .hs, .vc.tinted .dst b { color: var(--gink); }
+.vc.tinted .hl, .vc.tinted .dst .mono, .vc.tinted .dst i { color: var(--ginkm); }
+/* Band and tone colours are tuned for the dark card; on paper they need the darker end. */
+.vc.tinted .hs.band-mixed { color: #8a5a00; }
+.vc.tinted .hs.band-critical, .vc.tinted .hd.tone-down, .vc.tinted .dst b.tone-down { color: #a82743; }
+.vc.tinted .hd.tone-up, .vc.tinted .dst b.tone-up { color: #1e6b38; }
+
+.vc.tinted .ai-read { border-left-color: rgba(255, 255, 255, 0.35); color: rgba(255, 255, 255, 0.92); }
+.vc.tinted .ai-read b { color: rgba(255, 255, 255, 0.85); }
+
+.vc.tinted .trends, .vc.tinted .foot { border-top-color: rgba(255, 255, 255, 0.18); }
+.vc.tinted .drill { border-top-color: rgba(255, 255, 255, 0.24); }
+.vc.tinted .drill-label, .vc.tinted .trends .mono { color: rgba(255, 255, 255, 0.85); }
+.vc.tinted .trends .tone-up { color: #d7ffe3; }
+.vc.tinted .trends .tone-down { color: #ffd3db; }
+.vc.tinted .pulse { color: rgba(255, 255, 255, 0.8); }
+.vc.tinted .link { color: #fff; }
+.vc.tinted .link:hover { color: #fff; text-decoration: underline; }
+.vc.tinted .link.active { color: var(--purple); }
+
+/* TopicTag is a child component: its root element carries this scope id, so these reach it. */
+.vc.tinted .tag.up { background: var(--gpaper); color: #1e6b38; border-color: rgba(0, 0, 0, 0.22); font-weight: 700; }
+.vc.tinted .tag.down { background: var(--gpaper); color: #a82743; border-color: rgba(0, 0, 0, 0.22); font-weight: 700; }
 
 .head { display: flex; gap: 12px; align-items: flex-start; }
 .ident { min-width: 0; }

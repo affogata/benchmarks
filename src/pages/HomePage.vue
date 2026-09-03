@@ -49,7 +49,7 @@ const PROMPTS = [
   <div class="wrap">
     <section class="hero">
       <div class="hero-main">
-        <span class="badge mono">⚡ Powered by WebMCP · {{ agent.registeredCount || 15 }} live agent tools</span>
+        <span class="badge mono">⚡ Powered by WebMCP · {{ agent.registeredCount || 16 }} live agent tools</span>
         <h1>
           Customer voice for every game and app,
           <span class="accent">scored by version.</span>

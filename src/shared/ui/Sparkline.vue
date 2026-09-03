@@ -4,9 +4,22 @@ import { computed, useId } from 'vue'
 import type { HistoryPoint } from '@/domain/benchmarks/models'
 
 const props = withDefaults(
-  defineProps<{ points: HistoryPoint[]; width?: number; height?: number; stroke?: string }>(),
-  { width: 220, height: 46, stroke: 'var(--green)' },
+  defineProps<{
+    points: HistoryPoint[]
+    width?: number
+    height?: number
+    stroke?: string
+    /**
+     * Colour of the area wash under the line. Defaults to the stroke, which disappears
+     * into a near-black card; on a card tinted with a brand colour the same wash reads as
+     * a coloured block, so those callers pass a neutral instead.
+     */
+    fill?: string
+  }>(),
+  { width: 220, height: 46, stroke: 'var(--green)', fill: undefined },
 )
+
+const fillColor = computed(() => props.fill ?? props.stroke)
 
 const STROKE_WIDTH = 2
 const DOT_RADIUS = 3.2
@@ -72,8 +85,8 @@ const geometry = computed(() => {
   >
     <defs>
       <linearGradient :id="gradientId" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" :stop-color="props.stroke" stop-opacity="0.28" />
-        <stop offset="100%" :stop-color="props.stroke" stop-opacity="0" />
+        <stop offset="0%" :stop-color="fillColor" stop-opacity="0.28" />
+        <stop offset="100%" :stop-color="fillColor" stop-opacity="0" />
       </linearGradient>
     </defs>
     <path :d="geometry.area" :fill="`url(#${gradientId})`" />

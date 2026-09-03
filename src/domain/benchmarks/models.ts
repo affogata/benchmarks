@@ -72,6 +72,7 @@ export interface Title {
   gaining: string[]
   /** Topic clusters dragging the score down. */
   slipping: string[]
+  /** Affogata's written read on the score. Labelled "Affogata insight" wherever it shows. */
   aiRead: string | null
   movement: Movement
   reviewPulse: ReviewPulse | null

@@ -216,7 +216,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
     title: 'Get title detail',
     group: 'read',
     description:
-      'Full customer-voice profile for one game or app: current score, release history, the topic clusters pushing it up and down, the analyst read, movement against its category, and store-review volume where a live pull exists.',
+      'Full customer-voice profile for one game or app: current score, release history, the topic clusters pushing it up and down, the Affogata insight, movement against its category, and store-review volume where a live pull exists.',
     annotations: { readOnlyHint: true, untrustedContentHint: true },
     inputSchema: {
       type: 'object',
@@ -266,7 +266,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
         `Volatility across the window: ${fmtScore(volatility(view))} points.`,
       ]
 
-      if (view.aiRead) lines.push('', `Analyst read: ${view.aiRead}`)
+      if (view.aiRead) lines.push('', `Affogata insight: ${view.aiRead}`)
       if (view.reviewPulse) {
         const pulse = view.reviewPulse
         lines.push(
@@ -290,7 +290,7 @@ export function createCatalogTools(ctx: ToolContext): Array<ToolSpec<never>> {
           history: view.history,
           gaining: view.gaining,
           slipping: view.slipping,
-          analystRead: view.aiRead,
+          affogataInsight: view.aiRead,
           movement,
           reviewPulse: view.reviewPulse,
           volatility: volatility(view),

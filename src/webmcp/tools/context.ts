@@ -13,6 +13,8 @@ export interface ToolContext {
   dataset(): Dataset
   view: {
     filters(): ViewFilters
+    /** Live comparison ids — what the chips on /compare show *now*, human edits included. */
+    comparison(): string[]
     patch(next: Partial<ViewFilters>): ViewFilters
     reset(): void
     setComparison(ids: string[]): string[]
@@ -20,5 +22,6 @@ export interface ToolContext {
     toggleExpanded(id: string, force?: boolean): boolean
   }
   navigate(path: string): void
-  currentPath(): string
+  /** Path plus query — the shareable URL of what is on screen, not just the route. */
+  currentHref(): string
 }

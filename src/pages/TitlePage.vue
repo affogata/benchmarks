@@ -90,7 +90,7 @@ const basis = computed(() => (title.value?.cadence === 'version' ? 'previous ver
         </div>
 
         <p v-if="title.aiRead" class="panel ai">
-          <b class="mono">AI read</b>{{ title.aiRead }}
+          <b class="mono">Affogata insight</b>{{ title.aiRead }}
         </p>
 
         <div class="panel">

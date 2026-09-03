@@ -4,6 +4,9 @@
  * Each one drives the same store the human's clicks drive, so when the agent switches
  * category or builds a comparison, the page visibly moves with it. Every result reports
  * what changed on screen, which is what lets the agent narrate its own actions.
+ *
+ * `benchmarks_get_current_view` is the read half of that loop: the human drives the same
+ * store, so what an earlier act tool set up is not necessarily what is on screen now.
  */
 import { defineTool } from '../kernel/defineTool'
 import { fail, ok } from '../kernel/result'
@@ -18,9 +21,10 @@ import {
   queryTitles,
   SORT_KEYS,
   suggestTitles,
+  toView,
   type SortKey,
 } from '@/domain/benchmarks/selectors'
-import type { ViewFilters } from '@/stores/view.store'
+import { MAX_COMPARISON, type ViewFilters } from '@/stores/view.store'
 import { fmtDelta, fmtScore } from '@/shared/lib/format'
 
 /**
@@ -43,6 +47,71 @@ function browseHref(filters: ViewFilters): string {
 }
 
 export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> {
+  const getCurrentView = defineTool<Record<string, never>>({
+    name: 'benchmarks_get_current_view',
+    title: 'Read the current view',
+    group: 'read',
+    description:
+      'Read what the page is showing right now: the route, the active filters, and the exact titles pinned in the comparison. The person at the keyboard drives the same page you do — they can remove a comparison chip, add a title or change a filter at any moment — so call this before answering any question about "the current view", "this comparison" or "what is on screen" instead of trusting what an earlier call set up.',
+    annotations: { readOnlyHint: true },
+    inputSchema: { type: 'object', properties: {} },
+    examples: [{ label: 'What is on screen now', input: {} }],
+    handler: () => {
+      const dataset = ctx.dataset()
+      const filters = ctx.view.filters()
+      // Resolved against the dataset rather than reported as raw ids: a stale id in the
+      // store would otherwise be reported as a title the page is showing.
+      const comparison = ctx.view
+        .comparison()
+        .map((id) => findTitle(dataset, id))
+        .filter((title): title is Title => Boolean(title))
+        // Through `toView` for the resolved category — a bare Title only carries its id.
+        .map((title) => toView(dataset, title))
+      const href = ctx.currentHref()
+
+      const ranked = [...comparison].sort((a, b) => b.score - a.score)
+      const comparisonLine = comparison.length
+        ? `Comparison: ${comparison.map((item) => `${item.name} ${fmtScore(item.score)}`).join(', ')}.` +
+          (comparison.length >= 2
+            ? ` ${ranked[0]!.name} leads at ${fmtScore(ranked[0]!.score)}.`
+            : ' Fewer than two titles, so the compare page is showing its empty state.')
+        : 'Comparison: empty.'
+
+      const active = [
+        filters.categoryId
+          ? `category ${dataset.categories.find((item) => item.id === filters.categoryId)?.name ?? filters.categoryId}`
+          : null,
+        filters.industryId
+          ? `industry ${dataset.industries.find((item) => item.id === filters.industryId)?.name ?? filters.industryId}`
+          : null,
+        filters.search ? `search "${filters.search}"` : null,
+        filters.topic ? `topic "${filters.topic}"` : null,
+        filters.minScore !== null ? `score >= ${filters.minScore}` : null,
+      ].filter(Boolean)
+
+      return ok(
+        `The page is on ${href}. ${comparisonLine} Filters: ${active.length ? active.join(', ') : 'none'}, sorted by ${filters.sort} ${filters.order}, ${filters.mode} layout.`,
+        {
+          data: {
+            route: href,
+            filters,
+            comparison: comparison.map((item) => ({
+              id: item.id,
+              name: item.name,
+              score: item.score,
+              category: item.category.name,
+            })),
+            comparisonIds: comparison.map((item) => item.id),
+          },
+          nextSteps: [
+            'benchmarks_compare_in_ui({ titles, mode: "add" | "remove" }) to change the comparison without rebuilding it',
+            'benchmarks_compare_titles({ titles }) for the numbers behind the titles listed here',
+          ],
+        },
+      )
+    },
+  })
+
   const openCategory = defineTool<{ category: string }>({
     name: 'benchmarks_open_category',
     title: 'Open a category',
@@ -256,12 +325,12 @@ export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> 
     },
   })
 
-  const compareInUi = defineTool<{ titles: string[] }>({
+  const compareInUi = defineTool<{ titles: string[]; mode?: 'replace' | 'add' | 'remove' }>({
     name: 'benchmarks_compare_in_ui',
     title: 'Show a comparison',
     group: 'act',
     description:
-      'Put 2 to 5 titles side by side on the comparison page so the user can see the difference rather than read it. Pair this with benchmarks_compare_titles when you want both the numbers and the visual.',
+      'Put titles side by side on the comparison page so the user can see the difference rather than read it. The default mode replaces the whole selection, which is right for "compare X and Y" and wrong for "add a competitor" — use mode "add" to put titles alongside the ones already on screen, and mode "remove" to drop titles and keep the rest. Pair this with benchmarks_compare_titles when you want both the numbers and the visual.',
     annotations: { readOnlyHint: false },
     inputSchema: {
       type: 'object',
@@ -269,9 +338,17 @@ export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> 
         titles: {
           type: 'array',
           items: { type: 'string' },
-          minItems: 2,
-          maxItems: 5,
-          description: 'Two to five title ids or names.',
+          minItems: 1,
+          maxItems: MAX_COMPARISON,
+          description:
+            'Title ids or names. At least two when replacing, since a comparison needs two; one is enough to add or remove.',
+        },
+        mode: {
+          type: 'string',
+          enum: ['replace', 'add', 'remove'],
+          default: 'replace',
+          description:
+            'replace (default): these titles become the whole comparison. add: keep what is on screen and add these. remove: drop these and keep the rest.',
         },
       },
       required: ['titles'],
@@ -279,8 +356,10 @@ export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> 
     examples: [
       { label: 'Streaming showdown', input: { titles: ['netflix', 'disney-plus', 'hbo-max'] } },
       { label: 'Payments', input: { titles: ['revolut', 'paypal'] } },
+      { label: 'Add a competitor to what is on screen', input: { titles: ['monzo'], mode: 'add' } },
+      { label: 'Drop one title', input: { titles: ['revolut'], mode: 'remove' } },
     ],
-    handler: ({ titles }) => {
+    handler: ({ titles, mode = 'replace' }) => {
       const dataset = ctx.dataset()
       const resolved: Title[] = []
       const missing: string[] = []
@@ -298,25 +377,90 @@ export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> 
       // The store dedupes on the way in, so counting before that would promise the user two
       // titles on screen while the page renders its "pick at least two" state.
       const unique = distinctTitles(resolved)
-      if (unique.length < 2) {
-        return fail('Give at least two distinct titles.', [
-          `Resolved to: ${unique.map((item) => item.name).join(', ') || 'nothing'}.`,
-        ])
+      if (!unique.length) {
+        return fail('Give at least one title.', ['Resolved to: nothing.'])
       }
 
-      const ids = unique.map((item) => item.id)
-      ctx.view.setComparison(ids)
-      ctx.navigate(`/compare?titles=${ids.join(',')}`)
+      // Read from the store, never from what an earlier call set: the user edits the same
+      // comparison by hand, so anything remembered from a previous turn is a guess.
+      const current = ctx.view.comparison()
+      const nameOf = (id: string): string => findTitle(dataset, id)?.name ?? id
 
-      const ranked = [...unique].sort((a, b) => b.score - a.score)
-      return ok(
-        `Comparing ${unique.map((item) => item.name).join(' vs ')} on screen. ${ranked[0]!.name} leads at ${fmtScore(ranked[0]!.score)}.`,
-        {
-          data: { titleIds: ids, route: `/compare?titles=${ids.join(',')}` },
-          uiEffect: `The comparison page now shows ${unique.length} titles.`,
-          nextSteps: ['benchmarks_compare_titles({ titles }) for the full metric breakdown'],
-        },
-      )
+      let ids: string[]
+      /** Asked for but not applied — reported rather than dropped in silence. */
+      let ignored: string[] = []
+
+      if (mode === 'add') {
+        const additions = unique.filter((item) => !current.includes(item.id))
+        const already = unique.filter((item) => current.includes(item.id))
+        const room = MAX_COMPARISON - current.length
+        if (!additions.length) {
+          return fail(
+            `${already.map((item) => item.name).join(', ')} ${already.length === 1 ? 'is' : 'are'} already in the comparison.`,
+            [`On screen now: ${current.map(nameOf).join(', ') || 'nothing'}.`],
+          )
+        }
+        if (room <= 0) {
+          return fail(
+            `The comparison already holds its maximum of ${MAX_COMPARISON} titles, so ${additions.map((item) => item.name).join(', ')} cannot be added.`,
+            [
+              `On screen now: ${current.map(nameOf).join(', ')}.`,
+              'Drop one first with mode "remove", or pass mode "replace" to rebuild the whole selection.',
+            ],
+          )
+        }
+        ids = [...current, ...additions.slice(0, room).map((item) => item.id)]
+        ignored = [
+          ...already.map((item) => `${item.name} (already there)`),
+          ...additions.slice(room).map((item) => `${item.name} (no room)`),
+        ]
+      } else if (mode === 'remove') {
+        const removing = unique.filter((item) => current.includes(item.id))
+        if (!removing.length) {
+          return fail(
+            `None of ${unique.map((item) => item.name).join(', ')} are in the comparison.`,
+            [`On screen now: ${current.map(nameOf).join(', ') || 'nothing'}.`],
+          )
+        }
+        const drop = new Set(removing.map((item) => item.id))
+        ids = current.filter((id) => !drop.has(id))
+        ignored = unique.filter((item) => !drop.has(item.id)).map((item) => `${item.name} (not there)`)
+      } else {
+        if (unique.length < 2) {
+          return fail('Give at least two distinct titles to replace the comparison.', [
+            `Resolved to: ${unique.map((item) => item.name).join(', ')}.`,
+            'Pass mode "add" to put this title alongside the ones already on screen instead of replacing them.',
+          ])
+        }
+        ids = unique.map((item) => item.id)
+      }
+
+      ctx.view.setComparison(ids)
+      const route = ids.length ? `/compare?titles=${ids.join(',')}` : '/compare'
+      ctx.navigate(route)
+
+      const shown = ids.map((id) => findTitle(dataset, id)).filter((item): item is Title => Boolean(item))
+      const ranked = [...shown].sort((a, b) => b.score - a.score)
+      const headline = shown.length
+        ? `${mode === 'replace' ? 'Comparing' : 'The comparison now holds'} ${shown.map((item) => item.name).join(mode === 'replace' ? ' vs ' : ', ')} on screen.`
+        : 'The comparison is now empty.'
+      // Under two titles the page renders its "pick at least two" state, so claiming a
+      // leader here would describe a table the user cannot see.
+      const verdict =
+        shown.length >= 2
+          ? ` ${ranked[0]!.name} leads at ${fmtScore(ranked[0]!.score)}.`
+          : shown.length === 1
+            ? ' One title is not a comparison — the page is asking for a second.'
+            : ''
+
+      return ok(headline + verdict + (ignored.length ? ` Ignored: ${ignored.join(', ')}.` : ''), {
+        data: { titleIds: ids, route, mode, ignored },
+        uiEffect: `The comparison page now shows ${shown.length} title(s).`,
+        nextSteps: [
+          'benchmarks_compare_titles({ titles }) for the full metric breakdown',
+          'benchmarks_get_current_view() before your next answer about this comparison - the user can add or remove titles by hand',
+        ],
+      })
     },
   })
 
@@ -341,5 +485,5 @@ export function createNavigationTools(ctx: ToolContext): Array<ToolSpec<never>> 
     },
   })
 
-  return [openCategory, openTitle, setView, compareInUi, resetView] as unknown as Array<ToolSpec<never>>
+  return [getCurrentView, openCategory, openTitle, setView, compareInUi, resetView] as unknown as Array<ToolSpec<never>>
 }

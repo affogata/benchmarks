@@ -37,25 +37,26 @@ about it.
 
 ---
 
-## The tool surface — 15 tools
+## The tool surface — 16 tools
 
 Every tool is namespaced `benchmarks_*`, declares a JSON Schema, and carries
 `annotations.readOnlyHint` so a host knows which ones change state.
 
-### Read (10)
+### Read (11)
 
 | Tool | What it answers |
 | --- | --- |
 | `benchmarks_get_overview` | State of all 79 titles: distribution, happiest/unhappiest, biggest movers, rising and falling topics. |
 | `benchmarks_list_categories` | 16 categories with counts, averages and leaders. Optional industry filter. |
 | `benchmarks_list_titles` | Filter by category / industry / text / min score; sort by score, delta, momentum or volatility. |
-| `benchmarks_get_title` | Full profile for one title: history, topic clusters, analyst read, movement, live review pulse. |
+| `benchmarks_get_title` | Full profile for one title: history, topic clusters, Affogata insight, movement, live review pulse. |
 | `benchmarks_get_category_analytics` | Average, median, spread, leader/laggard, band split, gainers/droppers, topic frequency. |
 | `benchmarks_get_movers` | Week-over-week ranking — what changed since the last report. |
-| `benchmarks_compare_titles` | 2–5 titles across 8 metrics, plus shared and distinctive topic clusters. |
+| `benchmarks_compare_titles` | 2–5 titles across 7 metrics, plus shared and distinctive topic clusters. |
 | `benchmarks_find_by_topic` | Cross-category topic search: who is praised or punished for "paywall", "support", "ads"… |
 | `benchmarks_export_dataset` | Raw rows as `structuredContent` JSON for the agent's own analysis. |
 | `benchmarks_explain_methodology` | Scale, cadence, bands and limits — grounding before any number is quoted. |
+| `benchmarks_get_current_view` | What the page shows *now* — route, filters and the live comparison chips, human edits included. |
 
 ### Act — these move the page (5)
 
@@ -64,7 +65,7 @@ Every tool is namespaced `benchmarks_*`, declares a JSON Schema, and carries
 | `benchmarks_open_category` | Navigates to a category and shows its titles. |
 | `benchmarks_open_title` | Opens a title's detail page and flashes the card. |
 | `benchmarks_set_view` | Sets search, topic, industry, min score, sort, order and grid/table layout. |
-| `benchmarks_compare_in_ui` | Loads 2–5 titles into the comparison page. |
+| `benchmarks_compare_in_ui` | Loads 2–5 titles into the comparison page; `mode: "add"`/`"remove"` edits the live selection instead of replacing it. |
 | `benchmarks_reset_view` | Clears every filter and returns to the overview. |
 
 ### Three things worth looking at in the code
@@ -101,7 +102,7 @@ src/
   stores/                Pinia: corpus, view state, agent telemetry
   webmcp/
     kernel/              host adapter · registry · schema validation · result builders
-    tools/               15 tool definitions, grouped read / act
+    tools/               16 tool definitions, grouped read / act
     useWebMcp.ts         composition root: wires stores + router into the tool context
   shared/api/            transport: HttpClient, ApiError, base-URL config
   shared/                format helpers and presentational primitives
@@ -225,7 +226,7 @@ for tools to register anywhere other than `localhost`.
 - Dataset integrity asserted after every fetch: 79 titles, 16 categories, 8 industries, no
   orphan category references.
 - Registration confirmed against a live host: `document.modelContext.getTools()` returns all
-  15 tools, and `executeTool()` round-trips both a read tool and a UI-driving tool.
+  16 tools, and `executeTool()` round-trips both a read tool and a UI-driving tool.
 
 ## Licence
 

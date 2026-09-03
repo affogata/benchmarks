@@ -10,6 +10,9 @@ import type { SortKey } from '@/domain/benchmarks/selectors'
 
 export type ViewMode = 'grid' | 'table'
 
+/** How many titles the comparison holds. The table stops being readable past this. */
+export const MAX_COMPARISON = 5
+
 export interface ViewFilters {
   categoryId: string | null
   industryId: string | null
@@ -56,12 +59,12 @@ export const useViewStore = defineStore('view', () => {
     const list = new Set(comparison.value)
     if (list.has(titleId)) list.delete(titleId)
     else list.add(titleId)
-    comparison.value = [...list].slice(0, 5)
+    comparison.value = [...list].slice(0, MAX_COMPARISON)
     return comparison.value
   }
 
   function setComparison(titleIds: string[]): string[] {
-    comparison.value = [...new Set(titleIds)].slice(0, 5)
+    comparison.value = [...new Set(titleIds)].slice(0, MAX_COMPARISON)
     return comparison.value
   }
 

@@ -196,8 +196,11 @@ export function compare(dataset: Dataset, titles: Title[]): Comparison {
 
   const metrics: ComparisonMetric[] = [
     numeric('score', 'Impact score', (view) => view.score),
+    // No separate week-over-week row: `delta` and `movement.wow` carry the same number for
+    // every title the API serves — the score's change across the current window, whether
+    // that window is a release or a week. Two rows of it read as two findings that happen
+    // to agree, and the compare table is where that duplication is most visible.
     numeric('delta', 'Change on latest point', (view) => view.delta),
-    numeric('wow', 'Week over week', (view) => view.movement.wow),
     numeric('vsCategoryAvg', 'vs category average', (view) => view.movement.vsCategoryAvg),
     numeric('vsLeader', 'vs category leader', (view) => view.movement.vsLeader),
     numeric('storeRating', 'Store rating', (view) => view.storeRating),

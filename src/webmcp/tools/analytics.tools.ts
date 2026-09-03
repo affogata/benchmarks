@@ -302,8 +302,8 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
         '',
         table,
         '',
-        result.sharedGaining.length ? `Shared strengths: ${result.sharedGaining.join(', ')}.` : 'No strength is shared by all of them.',
-        result.sharedSlipping.length ? `Shared weaknesses: ${result.sharedSlipping.join(', ')}.` : 'No weakness is shared by all of them.',
+        result.sharedGaining.length ? `Shared strengths: ${result.sharedGaining.join(', ')}.` : 'No shared strengths.',
+        result.sharedSlipping.length ? `Shared weaknesses: ${result.sharedSlipping.join(', ')}.` : 'No shared weaknesses.',
         '',
         ...result.distinctive
           .filter((entry) => entry.gaining.length || entry.slipping.length)
@@ -325,7 +325,6 @@ export function createAnalyticsTools(ctx: ToolContext): Array<ToolSpec<never>> {
             category: view.category.name,
             score: view.score,
             delta: view.delta,
-            weekOverWeek: view.movement.wow,
             gaining: view.gaining,
             slipping: view.slipping,
           })),

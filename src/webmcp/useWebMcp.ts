@@ -14,7 +14,7 @@
  *  2. **A host that drops the registration.** `toolchange` plus the same poll re-check that
  *     the host still lists our tools, and re-register when it does not.
  *
- * `start()` no longer waits for the corpus. Registering 15 tools behind four API calls left
+ * `start()` no longer waits for the corpus. Registering 16 tools behind four API calls left
  * a window of several hundred milliseconds in which a host reading the tool list saw an
  * empty page — the tools are up immediately and the registry's ready gate makes the first
  * *call* wait instead.
@@ -47,6 +47,7 @@ export function useWebMcp(): WebMcpHandle {
     dataset: () => benchmarks.require(),
     view: {
       filters: () => view.filters,
+      comparison: () => view.comparison,
       patch: (next) => view.patch(next),
       reset: () => view.reset(),
       setComparison: (ids) => view.setComparison(ids),
@@ -56,7 +57,7 @@ export function useWebMcp(): WebMcpHandle {
     navigate: (path) => {
       void router.push(path)
     },
-    currentPath: () => router.currentRoute.value.path,
+    currentHref: () => router.currentRoute.value.fullPath,
   }
 
   /** The host the current registration belongs to — `null` is a meaningful value here. */
