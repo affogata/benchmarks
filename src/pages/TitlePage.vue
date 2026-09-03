@@ -8,7 +8,7 @@ import { fmtDelta, fmtRating, fmtScore } from '@/shared/lib/format'
 import Breadcrumbs from '@/shared/ui/Breadcrumbs.vue'
 import type { Crumb } from '@/shared/ui/breadcrumbs'
 import DeltaChip from '@/shared/ui/DeltaChip.vue'
-import Sparkline from '@/shared/ui/Sparkline.vue'
+import ScoreChart from '@/shared/ui/ScoreChart.vue'
 import StatTile from '@/shared/ui/StatTile.vue'
 import TitleIcon from '@/shared/ui/TitleIcon.vue'
 import TopicTag from '@/shared/ui/TopicTag.vue'
@@ -79,7 +79,13 @@ const basis = computed(() => (title.value?.cadence === 'version' ? 'previous ver
       <div class="main">
         <div class="panel chart">
           <div class="mono">Score across the tracked window</div>
-          <Sparkline :points="title.history" :stroke="strokeColor" :width="640" :height="120" />
+          <ScoreChart
+            :points="title.history"
+            :stroke="strokeColor"
+            :reference="{ value: title.movement.categoryAvg, label: `${title.category.shortName} avg` }"
+            :width="640"
+            :height="150"
+          />
           <ol class="axis">
             <li v-for="point in title.history" :key="point.label">
               <b :class="bandClass">{{ fmtScore(point.score) }}</b>

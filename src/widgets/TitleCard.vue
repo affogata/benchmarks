@@ -8,7 +8,7 @@ import { bandFor } from '@/domain/benchmarks/selectors'
 import { accentPalette } from '@/shared/lib/color'
 import { fmtDelta, fmtRating, fmtScore } from '@/shared/lib/format'
 import DeltaChip from '@/shared/ui/DeltaChip.vue'
-import Sparkline from '@/shared/ui/Sparkline.vue'
+import ScoreChart from '@/shared/ui/ScoreChart.vue'
 import TitleIcon from '@/shared/ui/TitleIcon.vue'
 import TopicTag from '@/shared/ui/TopicTag.vue'
 
@@ -84,12 +84,14 @@ const catPillStyle = computed(() =>
           <DeltaChip :value="title.delta" size="sm" :label="`vs ${basis}`" />
         </div>
       </div>
-      <Sparkline
+      <ScoreChart
         :points="title.history"
         :stroke="strokeColor"
         :fill="palette ? 'rgba(255, 255, 255, 0.45)' : undefined"
-        :width="150"
-        :height="44"
+        :axis-color="palette ? 'rgba(255, 255, 255, 0.85)' : undefined"
+        :reference="{ value: title.movement.categoryAvg, label: 'cat avg' }"
+        :width="210"
+        :height="64"
       />
     </div>
 

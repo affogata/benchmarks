@@ -8,7 +8,7 @@ import { findTitle, queryTitles } from '@/domain/benchmarks/selectors'
 import { accentPalette } from '@/shared/lib/color'
 import { fmtDelta, fmtScore } from '@/shared/lib/format'
 import Breadcrumbs from '@/shared/ui/Breadcrumbs.vue'
-import Sparkline from '@/shared/ui/Sparkline.vue'
+import ScoreChart from '@/shared/ui/ScoreChart.vue'
 import TitleIcon from '@/shared/ui/TitleIcon.vue'
 import TopicTag from '@/shared/ui/TopicTag.vue'
 
@@ -87,6 +87,23 @@ const heads = computed(() =>
   (result.value?.titles ?? []).map((title) => ({ title, palette: accentPalette(title.accent) })),
 )
 
+/**
+ * One y-window for all the head charts. Three lines each scaled to their own points look
+ * equally dramatic whatever they actually did, which is the opposite of what a comparison
+ * is for; on a shared axis a flat run reads as flat next to a climb.
+ */
+const chartDomain = computed<[number, number] | null>(() => {
+  const scores = heads.value.flatMap(({ title }) => title.history.map((point) => point.score))
+  if (!scores.length) return null
+  const low = Math.min(...scores)
+  const high = Math.max(...scores)
+  const pad = Math.max(0.4, (high - low) * 0.15)
+  return [
+    Math.max(0, Math.floor((low - pad) * 10) / 10),
+    Math.min(10, Math.ceil((high + pad) * 10) / 10),
+  ]
+})
+
 const formatValue = (key: string, value: number | string | null): string => {
   if (value === null) return '—'
   if (typeof value === 'string') return value
@@ -156,11 +173,14 @@ const formatValue = (key: string, value: number | string | null): string => {
           <RouterLink class="name" :to="`/title/${title.id}`">{{ title.name }}</RouterLink>
           <span class="mono">{{ title.category.shortName }}</span>
           <div class="big">{{ fmtScore(title.score) }}</div>
-          <Sparkline
+          <ScoreChart
             :points="title.history"
             :fill="palette ? 'rgba(255, 255, 255, 0.45)' : undefined"
-            :width="180"
-            :height="40"
+            :axis-color="palette ? 'rgba(255, 255, 255, 0.85)' : undefined"
+            :domain="chartDomain"
+            :width="200"
+            :height="76"
+            show-labels
           />
         </article>
       </div>
